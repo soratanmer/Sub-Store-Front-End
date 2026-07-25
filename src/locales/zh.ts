@@ -870,6 +870,19 @@ export default {
     cacheConfig: "缓存配置",
     frontEndConfig: "前端配置",
     githubConfig: 'GitHub 配置',
+    downloadTokenStrategy: {
+      label: '下载时 Token',
+      ask: '每次询问（默认）',
+      overwrite: '覆盖 Token',
+      keep: '保留当前 Token',
+      dialog: {
+        title: 'Token 处理',
+        content: '保留当前 Token 需要后端 >= 2.19.83',
+        doNotAskAgain: '不再询问（可在 GitHub 配置中修改）',
+        overwrite: '覆盖 Token',
+        keep: '保留当前 Token',
+      },
+    },
     logsTitle: '后端日志',
     storage: {
       gist: {

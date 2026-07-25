@@ -908,6 +908,19 @@ export default {
     cacheConfig: "Cache Configuration",
     frontEndConfig: "Front-End Configuration",
     githubConfig: 'GitHub Configuration',
+    downloadTokenStrategy: {
+      label: "Token handling when downloading",
+      ask: "Always ask (default)",
+      overwrite: "Overwrite Token",
+      keep: "Keep current Token",
+      dialog: {
+        title: "Please choose",
+        content: "To keep the GitHub Token currently configured on this device, choose Keep (backend version must be >= 2.19.83).",
+        doNotAskAgain: "Don't ask again (GitHub settings)",
+        overwrite: "Overwrite (Token may need to be configured again)",
+        keep: "Keep current Token and overwrite other data",
+      },
+    },
     logsTitle: 'Backend Logs',
     storage: {
       gist: {

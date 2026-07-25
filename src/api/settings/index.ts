@@ -16,14 +16,15 @@ export function useSettingsApi() {
         data,
       });
     },
-    syncSettings: (query: 'download' | 'upload', options?: { keep?: string[], encode?: GistUploadMode }): AxiosPromise<MyAxiosRes> => {
+    syncSettings: (query: 'download' | 'upload', options?: GistBackupSyncOptions): AxiosPromise<MyAxiosRes> => {
       return request({
         url: `/api/utils/backup`,
         method: 'get',
         params: {
           action: query,
           keep: options?.keep?.join(','),
-          encode: options?.encode
+          encode: options?.encode,
+          tokenStrategy: options?.tokenStrategy,
         }
       });
     },

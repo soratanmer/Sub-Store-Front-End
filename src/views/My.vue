@@ -205,6 +205,25 @@
             @confirm="handleGistUploadConfirm"
           />
           <nut-input
+            class="input picker-input"
+            :model-value="downloadTokenStrategyName"
+            readonly
+            :placeholder="$t(`myPage.downloadTokenStrategy.label`)"
+            type="text"
+            input-align="left"
+            :left-icon="iconKey"
+            right-icon="rect-right"
+            @click="openDownloadTokenStrategyPicker"
+            @click-right-icon="openDownloadTokenStrategyPicker"
+          />
+          <DesktopPicker
+            v-model="downloadTokenStrategyPickerValue"
+            v-model:visible="showDownloadTokenStrategyPicker"
+            :columns="downloadTokenStrategyColumns"
+            :title="$t(`myPage.downloadTokenStrategy.label`)"
+            @confirm="handleDownloadTokenStrategyConfirm"
+          />
+          <nut-input
             v-if="isGistBackupAgeMode"
             class="input"
             v-model="ageSecretKeyInput"
@@ -659,6 +678,29 @@
       <p v-else>v{{ env.version }}</p>
       <p>{{ env.meta?.node?.env?.SUB_STORE_BACKEND_CUSTOM_NAME || env.backend }}</p>
     </div>
+
+    <nut-dialog
+      v-model:visible="showDownloadTokenDialog"
+      teleport="#app"
+      pop-class="download-token-dialog auto-dialog"
+      :title="$t(`myPage.downloadTokenStrategy.dialog.title`)"
+      :ok-text="$t(`myPage.downloadTokenStrategy.dialog.keep`)"
+      :cancel-text="$t(`myPage.downloadTokenStrategy.dialog.overwrite`)"
+      footer-direction="vertical"
+      close-on-popstate
+      :lock-scroll="false"
+      @ok="downloadWithTokenStrategy('keep')"
+      @cancel="downloadWithTokenStrategy('overwrite')"
+      @closed="rememberDownloadTokenStrategy = false"
+    >
+      <div class="download-token-dialog-content">
+        <p>{{ $t(`myPage.downloadTokenStrategy.dialog.content`) }}</p>
+        <label class="download-token-dialog-checkbox">
+          <input v-model="rememberDownloadTokenStrategy" type="checkbox">
+          <span>{{ $t(`myPage.downloadTokenStrategy.dialog.doNotAskAgain`) }}</span>
+        </label>
+      </div>
+    </nut-dialog>
   </div>
 </template>
 
@@ -681,7 +723,10 @@ import iconTimeout from "@/assets/icons/timeout.svg";
 import iconConcurrency from "@/assets/icons/concurrency.svg";
 import { useAppNotifyStore } from "@/store/appNotify";
 import { useGlobalStore } from "@/store/global";
-import { useSettingsStore } from "@/store/settings";
+import {
+  normalizeGistDownloadTokenStrategy,
+  useSettingsStore,
+} from "@/store/settings";
 import { butifyDate } from "@/utils/butifyDate";
 import { downloadBlobResponse } from "@/utils/download";
 import { createGithubProxyUrlRewriter } from "@/utils/githubProxy";
@@ -705,12 +750,14 @@ const router = useRouter();
 const { showNotify } = useAppNotifyStore();
 const { currentUrl: host } = useHostAPI();
 const settingsStore = useSettingsStore();
-const { githubUser, gistToken, syncTime, defaultUserAgent, defaultFlowUserAgent, defaultProxy, defaultTimeout, backendRequestConcurrency, backendRequestConcurrencyWaitTime, cacheThreshold, resourceCacheTtl, headersCacheTtl, scriptCacheTtl, logsMaxCount, syncPlatform, githubProxy, githubApiUrl, githubApiTimeout, artifactSyncBatchSize, githubProxyRegex, gistUpload, ageSecretKey } =
+const { githubUser, gistToken, syncTime, defaultUserAgent, defaultFlowUserAgent, defaultProxy, defaultTimeout, backendRequestConcurrency, backendRequestConcurrencyWaitTime, cacheThreshold, resourceCacheTtl, headersCacheTtl, scriptCacheTtl, logsMaxCount, syncPlatform, githubProxy, githubApiUrl, githubApiTimeout, artifactSyncBatchSize, githubProxyRegex, gistUpload, gistDownloadTokenStrategy, ageSecretKey } =
   storeToRefs(settingsStore);
 
 const DEFAULT_GITHUB_API_URL = "https://api.github.com";
 const GIST_UPLOAD_MODES = ["base64", "age", "plaintext"] as const;
+const DOWNLOAD_TOKEN_STRATEGIES = ["ask", "overwrite", "keep"] as const;
 type GistUploadMode = typeof GIST_UPLOAD_MODES[number];
+
 const avatarLoadFailed = ref(false);
 const avatarRenderNonce = ref(0);
 
@@ -819,6 +866,10 @@ const userInput = ref("");
 const tokenInput = ref("");
 const gistUploadInput = ref<GistUploadMode>("base64");
 const gistUploadPickerValue = ref<GistUploadMode[]>(["base64"]);
+const downloadTokenStrategyInput = ref<DownloadTokenStrategy>(
+  normalizeGistDownloadTokenStrategy(gistDownloadTokenStrategy.value),
+);
+const downloadTokenStrategyPickerValue = ref<DownloadTokenStrategy[]>([downloadTokenStrategyInput.value]);
 const ageSecretKeyInput = ref("");
 const githubProxyInput = ref("");
 const githubApiUrlInput = ref("");
@@ -849,6 +900,9 @@ const isInit = ref(false);
 const storageType = ref('gist');
 const fileInput = ref(null);
 const showGistUploadPicker = ref(false);
+const showDownloadTokenStrategyPicker = ref(false);
+const showDownloadTokenDialog = ref(false);
+const rememberDownloadTokenStrategy = ref(false);
 
 const normalizeGistUploadMode = (value?: string): GistUploadMode => {
   return GIST_UPLOAD_MODES.includes(value as GistUploadMode) ? value as GistUploadMode : "base64";
@@ -861,6 +915,18 @@ const gistUploadColumns = computed(() => GIST_UPLOAD_MODES.map((value) => ({
 
 const gistUploadName = computed(() => t(`moreSettingPage.gistUpload.${gistUploadInput.value}`));
 const isGistBackupAgeMode = computed(() => gistUploadInput.value === "age");
+const downloadTokenStrategyColumns = computed(() => DOWNLOAD_TOKEN_STRATEGIES.map((value) => ({
+  text: t(`myPage.downloadTokenStrategy.${value}`),
+  value,
+})));
+const downloadTokenStrategyName = computed(() => {
+  return `${t("myPage.downloadTokenStrategy.label")}: ${t(`myPage.downloadTokenStrategy.${downloadTokenStrategyInput.value}`)}`;
+});
+
+const setDownloadTokenStrategyInput = (strategy: DownloadTokenStrategy) => {
+  downloadTokenStrategyInput.value = strategy;
+  downloadTokenStrategyPickerValue.value = [strategy];
+};
 
 const openGistUploadPicker = () => {
   if (!isGitHubConfigEditing.value) return;
@@ -874,6 +940,18 @@ const handleGistUploadConfirm = ({ selectedValue }) => {
   gistUploadPickerValue.value = [mode];
 };
 
+const openDownloadTokenStrategyPicker = () => {
+  if (!isGitHubConfigEditing.value) return;
+  downloadTokenStrategyPickerValue.value = [downloadTokenStrategyInput.value];
+  showDownloadTokenStrategyPicker.value = true;
+};
+
+const handleDownloadTokenStrategyConfirm = ({ selectedValue }) => {
+  setDownloadTokenStrategyInput(
+    normalizeGistDownloadTokenStrategy(selectedValue?.[0]),
+  );
+};
+
 const createSettingsPayload = (type: string): SettingsPostData => {
   if (type === "github") {
     const payload: SettingsPostData = {
@@ -881,6 +959,7 @@ const createSettingsPayload = (type: string): SettingsPostData => {
       githubUser: userInput.value,
       gistToken: tokenInput.value,
       gistUpload: gistUploadInput.value,
+      gistDownloadTokenStrategy: downloadTokenStrategyInput.value,
       githubProxy: githubProxyInput.value,
       githubApiUrl: githubApiUrlInput.value,
       githubApiTimeout: githubApiTimeoutInput.value,
@@ -941,6 +1020,9 @@ const toggleEditMode = async (type) => {
       tokenInput.value = gistToken.value;
       gistUploadInput.value = normalizeGistUploadMode(gistUpload.value);
       gistUploadPickerValue.value = [gistUploadInput.value];
+      setDownloadTokenStrategyInput(
+        normalizeGistDownloadTokenStrategy(gistDownloadTokenStrategy.value),
+      );
       ageSecretKeyInput.value = ageSecretKey.value;
       githubProxyInput.value = githubProxy.value;
       githubApiUrlInput.value = githubApiUrl.value || "";
@@ -1105,6 +1187,9 @@ const setDisplayInfo = () => {
   userInput.value = githubUser.value || "";
   gistUploadInput.value = normalizeGistUploadMode(gistUpload.value);
   gistUploadPickerValue.value = [gistUploadInput.value];
+  setDownloadTokenStrategyInput(
+    normalizeGistDownloadTokenStrategy(gistDownloadTokenStrategy.value),
+  );
   ageSecretKeyInput.value = ageSecretKey.value || "";
   githubProxyInput.value = githubProxy.value || "";
   githubApiUrlInput.value = githubApiUrl.value || "";
@@ -1225,7 +1310,7 @@ const upload = async() => {
   }
 }
 
-const sync = async (query: "download" | "upload", options?: { keep?: string[], encode?: GistUploadMode }) => {
+const sync = async (query: "download" | "upload", options?: GistBackupSyncOptions) => {
   switch (query) {
     case "download":
       downloadIsLoading.value = true;
@@ -1324,25 +1409,43 @@ const downloadBtn = () => {
   if (!ensureGitHubConfigReadyForSync("download")) {
     return;
   }
-  Dialog({
-    title: '请选择',
-    content: '若想保留本地当前已设置的 GitHub Token, 请选择保留(后端版本必须 >= 2.19.83)',
-    footerDirection: 'vertical',
-    onCancel: () => {
-      sync('download');
-    },
-    okText: '保留当前 Token, 覆盖其他数据',
-    cancelText: '覆盖(可能需重新设置 Token)',
-    onOk: () => {
-      sync('download', {
-        keep: ['settings.gistToken']
-      });
-    },
-    popClass: "auto-dialog",
-    closeOnPopstate: true,
-    lockScroll: false,
-  });
+
+  const strategy = normalizeGistDownloadTokenStrategy(
+    gistDownloadTokenStrategy.value,
+  );
+
+  if (strategy !== "ask") {
+    downloadWithTokenStrategy(strategy);
+    return;
+  }
+
+  rememberDownloadTokenStrategy.value = false;
+  showDownloadTokenDialog.value = true;
 }
+
+const downloadWithTokenStrategy = async (
+  strategy: Exclude<DownloadTokenStrategy, "ask">,
+) => {
+  if (rememberDownloadTokenStrategy.value) {
+    const saveSucceeded = await settingsStore.changeSettings(
+      { gistDownloadTokenStrategy: strategy },
+      { notifySuccess: false },
+    );
+    if (!saveSucceeded) return;
+    setDownloadTokenStrategyInput(strategy);
+  }
+
+  await sync(
+    "download",
+    {
+      tokenStrategy: strategy,
+      keep: [
+        "settings.gistDownloadTokenStrategy",
+        ...(strategy === "keep" ? ["settings.gistToken"] : []),
+      ],
+    },
+  );
+};
 const githubProxyTips = () => {
   Dialog({
       title: '请填写完整 GitHub 加速代理地址',
@@ -1864,5 +1967,28 @@ const setTag = (current) => {
 
 .nut-icon {
   color: var(--lowest-text-color);
+}
+
+.download-token-dialog-content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+
+  .download-token-dialog-checkbox {
+    display: flex;
+    align-items: center;
+    align-self: center;
+    gap: 6px;
+    font-size: 13px;
+    white-space: nowrap;
+    cursor: pointer;
+
+    input {
+      width: 14px;
+      height: 14px;
+      margin: 0;
+      accent-color: var(--primary-color);
+    }
+  }
 }
 </style>
