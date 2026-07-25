@@ -62,7 +62,7 @@ const viteConfig = defineConfig((mode: ConfigEnv) => {
         srcDir: "src",
         outDir: "dist",
         strategies: "generateSW",
-        registerType: "autoUpdate",
+        registerType: "prompt",
         // minify: true,
         // includeAssets: ['favicon.svg'],
         manifest: {
@@ -123,8 +123,6 @@ const viteConfig = defineConfig((mode: ConfigEnv) => {
               },
             },
           ],
-          skipWaiting: true,
-          clientsClaim: true,
         },
         selfDestroying: false,
       }),
