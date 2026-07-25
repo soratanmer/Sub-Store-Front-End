@@ -600,7 +600,6 @@ const filteredArtifacts = useFilteredDraggableList(artifacts, shouldShowElement)
 
   .actions-wrapper {
     flex: 0 0 auto;
-    margin-right: 16px;
 
     .btn:not(:last-child) {
       margin-right: 8px;
