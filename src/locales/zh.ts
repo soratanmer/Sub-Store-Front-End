@@ -707,6 +707,7 @@ export default {
             'TrustTunnel',
             'OpenVPN',
             'GOST Relay',
+            'ZeroTier',
             'Tailscale',
             'WireGuard',
             'SSH',
