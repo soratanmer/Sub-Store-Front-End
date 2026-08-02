@@ -42,6 +42,7 @@ interface Sub {
   iconFit?: ImageFit | null;
   ua?: string;
   mergeSources?: string;
+  noFlow?: boolean;
   subUserinfo?: string;
   tag?: string[];
   'age-public-key'?: string;
@@ -56,6 +57,7 @@ interface Collection {
   subscriptions: string[];
   subscriptionTags?: string[];
   firstSubFlow?: boolean;
+  noFlow?: boolean;
   subUserinfo?: string;
   proxy?: string;
   icon?: string;
